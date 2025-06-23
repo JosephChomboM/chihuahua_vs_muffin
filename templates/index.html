@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador Chihuahua vs Muffin</title>
+    <meta name="theme-color" content="#f8fafc">
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --light-purple: #c4b5fd;
+            --dog: #f59e0b;
+            --muffin: #b45309;
+            --background: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.5;
+            padding: 1rem;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: 2rem auto;
+        }        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            color: var(--primary);
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+
+        .video-container {
+            background-color: var(--card);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        #webcam {
+            width: 100%;
+            display: block;
+        }
+
+        .result {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }        .result #prediction {
+            transition: color 0.3s ease;
+        }
+
+        .result #confidence {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            margin-top: 0.25rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }        button:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+            background-color: var(--light-purple);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background-color: var(--border);
+            color: var(--text-light);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }        #stopBtn {
+            background-color: var(--text);
+        }
+
+        #stopBtn:hover {
+            background-color: var(--text-light);
+        }
+
+        .chihuahua {
+            color: var(--dog);
+        }
+
+        .muffin {
+            color: var(--muffin);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 0.5rem auto;
+            }
+            
+            button {
+                padding: 0.6rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>    <div class="container">
+        <h1>Clasificador Chihuahua vs Muffin</h1>
+        <div class="subtitle">¿Puede la IA diferenciar entre un perro pequeño y un delicioso postre?</div>
+        
+        <div class="video-container">
+            <video id="webcam" autoplay playsinline></video>
+            <canvas id="canvas" style="display: none;"></canvas>
+            
+            <div class="result">
+                <div id="prediction">Esperando la cámara web...</div>
+                <div id="confidence"></div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Empezar</button>
+            <button id="stopBtn" disabled>Parar</button>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const predictionEl = document.getElementById('prediction');
+        const confidenceEl = document.getElementById('confidence');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        
+        let isRunning = false;
+        let stream = null;
+
+        // Start webcam and prediction
+        startBtn.addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: false
+                });
+                
+                video.srcObject = stream;
+                
+                // Set canvas size based on video dimensions
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                };
+                
+                isRunning = true;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                predictionEl.textContent = "Analizando...";
+                
+                // Start prediction loop
+                predictLoop();
+                
+            } catch (err) {
+                console.error("Error accessing webcam:", err);
+                predictionEl.textContent = "Error al acceder a la cámara web";
+                predictionEl.className = "";
+            }
+        });
+        
+        // Stop webcam and prediction
+        stopBtn.addEventListener('click', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            isRunning = false;
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            predictionEl.textContent = "Detección detenida";
+            predictionEl.className = "";
+            confidenceEl.textContent = "";
+        });
+        
+        // Prediction loop
+        async function predictLoop() {
+            if (!isRunning) return;
+            
+            await predict();
+            
+            // Run loop at 3 frames per second (adjust as needed)
+            setTimeout(predictLoop, 333);
+        }
+        
+        // Make a prediction
+        async function predict() {
+            try {
+                // Draw video frame to canvas
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Convert canvas to base64 image
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                // Send to server
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ image: imageData })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Server error');
+                }
+                
+                const result = await response.json();
+                // Update UI
+                predictionEl.textContent = `¡Eso es un ${result.class === "chihuahua" ? "chihuahua" : "muffin"}!`;
+                confidenceEl.textContent = `Confianza: ${result.confidence.toFixed(1)}%`;
+                
+                // Style based on result
+                if (result.class === "chihuahua") {
+                    predictionEl.className = "chihuahua";
+                } else {
+                    predictionEl.className = "muffin";
+                }
+                
+            } catch (err) {
+                console.error("Error during prediction:", err);                
+                predictionEl.textContent = "Error durante la predicción";
+                predictionEl.className = "";
+            }
+        }
+    </script>
+</body>
+</html>
