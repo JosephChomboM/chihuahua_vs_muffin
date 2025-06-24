@@ -11,9 +11,9 @@ from tensorflow.keras.applications.densenet import DenseNet201
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from sklearn.model_selection import train_test_split
 
-# Download latest version
-path = kagglehub.dataset_download("samuelcortinhas/muffin-vs-chihuahua-image-classification")
 
+import kagglehub
+path = kagglehub.dataset_download("samuelcortinhas/muffin-vs-chihuahua-image-classification")
 print("Path to dataset files:", path)
 
 # Constants for improved model
@@ -116,6 +116,7 @@ predictions = tf.keras.layers.Dense(NUM_CLASSES, activation='softmax')(x)
 
 # Crear el modelo final
 model = tf.keras.models.Model(inputs=base_model.input, outputs=predictions)
+
 def create_callbacks():
     checkpoint_path = './best_model.h5'
 
@@ -140,7 +141,7 @@ def create_callbacks():
         verbose=1
     )
     tensorboard = tf.keras.callbacks.TensorBoard(
-        log_dir='logs/densenet_cats_dogs',
+        log_dir='logs/muffinvschihuahua',
         histogram_freq=1
     )
     callbacks = [checkpoint, reduce_lr, early_stop, tensorboard]
